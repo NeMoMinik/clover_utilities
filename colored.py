@@ -17,16 +17,16 @@ navigate = rospy.ServiceProxy('navigate', srv.Navigate)
 land = rospy.ServiceProxy('land', Trigger)
 set_velocity = rospy.ServiceProxy('set_velocity', srv.SetVelocity)
 
-#hsv_min = np.array((104, 123, 211), np.uint8) # 105 67 67   138 255 235
-#hsv_max = np.array((155, 186, 255), np.uint8)
-hsv_min = np.array((105, 67, 67), np.uint8)
-hsv_max = np.array((138, 255, 235), np.uint8)
+hsv_min = np.array((63, 54, 92), np.uint8) # 105 67 67   138 255 235
+hsv_max = np.array((255, 106, 168), np.uint8)
+#hsv_min = np.array((105, 67, 67), np.uint8)
+#hsv_max = np.array((138, 255, 235), np.uint8)
 center = [0]
 detected = [False]
 c = [0, 0]
 def image_callback(data):
     cv_image = bridge.imgmsg_to_cv2(data, 'bgr8')
-    hsv_img = cv.cvtColor(cv_image, cv.COLOR_BGR2HSV)
+    hsv_img = cv_image # cv.cvtColor(cv_image, cv.COLOR_BGR2HSV)
     thresh = cv.inRange(hsv_img, hsv_min, hsv_max)
     center[0] = thresh[120][160]
     contours, hierarchy = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
@@ -40,7 +40,7 @@ def image_callback(data):
         try:
             cx = int(M['m10']/M['m00'])
             cy = int(M['m01']/M['m00'])
-            c[:] = [(160 - cx) * 0.01, (120 - cy) * 0.01]
+            c[:] = [(160 - cx) * 0.03, (120 - cy) * 0.03]
             if c[1] > 0.5:
                 c[1] = 0.5
             elif c[1] < -0.5:
@@ -61,10 +61,10 @@ def image_callback(data):
     image_pub.publish(bridge.cv2_to_imgmsg(cv_image, 'bgr8'))
 
 
-def navigate_wait(x=0, y=0, z=0, yaw=float('nan'), speed=0.5, frame_id='', auto_arm=False, tolerance=0.2):
+def navigate_wait(x=0.0, y=0.0, z=0.0, yaw=float('nan'), speed=0.5, frame_id='', auto_arm=False, tolerance=0.2):
     navigate(x=x, y=y, z=z, yaw=yaw, speed=speed, frame_id=frame_id, auto_arm=auto_arm)
 
-    while not rospy.is_shutdown() and not detected[0]:
+    while not rospy.is_shutdown() and (not detected[0] or auto_arm):
         telem = get_telemetry(frame_id='navigate_target')
         if math.sqrt(telem.x ** 2 + telem.y ** 2 + telem.z ** 2) < tolerance:
             break
@@ -78,13 +78,13 @@ def land_wait():
 
 image_sub = rospy.Subscriber('main_camera/image_raw_throttled', Image, image_callback, queue_size=1)
 image_pub = rospy.Publisher('~debug', Image, queue_size=1)
-navigate_wait(0.0, 0.0, 1, frame_id='body', auto_arm=True)
+'''navigate_wait(0.0, 0.0, 1, frame_id='body', auto_arm=True)
 navigate_wait(1.2, 1.2, 1, frame_id='aruco_map')
 navigate_wait(1.2, 3, 1, frame_id='aruco_map')
 navigate_wait(3.2, 3, 1, frame_id='aruco_map')
 navigate_wait(3.2, 1.2, 1, frame_id='aruco_map')
-navigate_wait(1.2, 1.2, 1, frame_id='aruco_map')
-if detected[0]:
+navigate_wait(1.2, 1.2, 1, frame_id='aruco_map')'''
+'''if detected[0]:
     while True:
-        set_velocity(vx=-c[1], vy=-c[0], vz=0, frame_id='body')
+        set_velocity(vx=-c[1], vy=-c[0], vz=0, frame_id='body')'''
 rospy.spin()
