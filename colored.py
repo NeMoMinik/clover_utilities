@@ -2,7 +2,6 @@ import rospy
 from clover import srv
 from std_srvs.srv import Trigger
 import cv2 as cv
-import numpy as np
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import math
@@ -17,17 +16,18 @@ navigate = rospy.ServiceProxy('navigate', srv.Navigate)
 land = rospy.ServiceProxy('land', Trigger)
 set_velocity = rospy.ServiceProxy('set_velocity', srv.SetVelocity)
 
-hsv_min = np.array((63, 54, 92), np.uint8) # 105 67 67   138 255 235
-hsv_max = np.array((255, 106, 168), np.uint8)
-#hsv_min = np.array((105, 67, 67), np.uint8)
-#hsv_max = np.array((138, 255, 235), np.uint8)
+color_ranges = {
+    'simulator': [np.array((63, 54, 92), np.uint8), np.array((255, 106, 168), np.uint8)],
+    'real_wrong': [np.array((105, 67, 67), np.uint8), np.array((138, 255, 235), np.uint8)],
+    'real_red': [np.array((128, 87, 113), np.uint8), np.array((176, 125, 171), np.uint8)]
+}
 center = [0]
 detected = [False]
 c = [0, 0]
 def image_callback(data):
     cv_image = bridge.imgmsg_to_cv2(data, 'bgr8')
-    hsv_img = cv_image # cv.cvtColor(cv_image, cv.COLOR_BGR2HSV)
-    thresh = cv.inRange(hsv_img, hsv_min, hsv_max)
+    hsv_img = cv.cvtColor(cv_image, cv.COLOR_BGR2HSV)
+    thresh = cv.inRange(hsv_img, color_ranges['real_red'][0], color_ranges['real_red'][1])
     center[0] = thresh[120][160]
     contours, hierarchy = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
     contours = list(filter(lambda x: cv.contourArea(x) > 38, contours))
@@ -40,7 +40,7 @@ def image_callback(data):
         try:
             cx = int(M['m10']/M['m00'])
             cy = int(M['m01']/M['m00'])
-            c[:] = [(160 - cx) * 0.03, (120 - cy) * 0.03]
+            c[:] = [(160 - cx) * 0.007, (120 - cy) * 0.007]
             if c[1] > 0.5:
                 c[1] = 0.5
             elif c[1] < -0.5:
@@ -78,13 +78,13 @@ def land_wait():
 
 image_sub = rospy.Subscriber('main_camera/image_raw_throttled', Image, image_callback, queue_size=1)
 image_pub = rospy.Publisher('~debug', Image, queue_size=1)
-'''navigate_wait(0.0, 0.0, 1, frame_id='body', auto_arm=True)
-navigate_wait(1.2, 1.2, 1, frame_id='aruco_map')
-navigate_wait(1.2, 3, 1, frame_id='aruco_map')
-navigate_wait(3.2, 3, 1, frame_id='aruco_map')
-navigate_wait(3.2, 1.2, 1, frame_id='aruco_map')
-navigate_wait(1.2, 1.2, 1, frame_id='aruco_map')'''
-'''if detected[0]:
-    while True:
-        set_velocity(vx=-c[1], vy=-c[0], vz=0, frame_id='body')'''
+navigate_wait(0.0, 0.0, 0.5, frame_id='body', auto_arm=True)
+navigate_wait(1.2, 1.2, 0.5, frame_id='aruco_map')
+navigate_wait(1.2, 3, 0.5, frame_id='aruco_map')
+navigate_wait(3.2, 3, 0.5, frame_id='aruco_map')
+navigate_wait(3.2, 1.2, 0.5, frame_id='aruco_map')
+navigate_wait(1.2, 1.2, 0.5, frame_id='aruco_map')
+if detected[0]:
+    while not rospy.is_shutdown():
+        set_velocity(vx=-c[1], vy=-c[0], vz=0, frame_id='body')
 rospy.spin()
